@@ -1,33 +1,34 @@
 .sidebar {
-  width: 240px;
+  width: 250px;
   height: 100vh;
-  background: #f4f1ea;
+  background-color: #f5f2e8;
+  padding: 20px;
+  box-sizing: border-box;
+  border-right: 1px solid #e0e0e0;
   color: #222;
-  padding: 3rem 2rem 2rem 1.5rem;
   display: flex;
   flex-direction: column;
   font-family: 'Inter', sans-serif;
-  border-right: 1px solid #e0ddd6;
 }
 
 .sidebar-title {
+  font-size: 32px;
+  font-weight: regular;
+  margin-bottom: 20px;
+  color: #234729;
   font-family: 'Instrument Serif', serif;
-  color: #3a6b41;
-  font-size: 2rem;
-  font-weight: 500;
-  margin-bottom: 3rem;
   padding-left: 0;
 }
 
 .sidebar-label {
-  font-size: 0.75rem;
+  font-size: 12px;
   color: #7b8a7a;
   letter-spacing: 0.05em;
   font-family: 'Inter', sans-serif;
   font-variant: small-caps;
   font-weight: 900;
-  margin-bottom: 1.25rem;
-  padding-left: 0;
+  margin-bottom: 0.5rem;
+  margin-top: 0.5rem;
 }
 
 .new-chat {
@@ -37,28 +38,28 @@
 
 .new-chat-button {
   width: 100%;
-  padding: 0.75rem 1rem;
+  padding: 10px;
   background-color: #3a6b41;
   color: white;
   border: none;
-  border-radius: 0.5rem;
+  border-radius: 4px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
   cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  margin-bottom: 20px;
+  transition: background-color 0.2s;
+  transition: transform 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+
 }
 
 .new-chat-button:hover {
-  background-color: #2d5533;
-  transform: translateY(-1px);
-}
-
-.new-chat-button:active {
-  transform: translateY(0);
+  background-color: #234729;
+  transform: scale(1.05);
 }
 
 .project-list {
@@ -85,7 +86,7 @@
 }
 
 .project-item {
-  font-size: 0.95rem;
+  font-size: 14px;
   color: #222;
   padding: 0.75rem 1rem 0.75rem 1rem;
   margin-bottom: 0.25rem;

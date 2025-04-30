@@ -12,11 +12,31 @@ function App() {
   ]);
 
   const addNewProject = (projectName) => {
+    // Generate a unique ID based on timestamp
+    const newId = Date.now();
     const newProject = {
-      id: projects.length + 1,
+      id: newId,
       name: projectName
     };
-    setProjects([...projects, newProject]);
+    setProjects(prevProjects => [...prevProjects, newProject]);
+  };
+
+  const updateProject = (projectId, newName) => {
+    setProjects(prevProjects => 
+      prevProjects.map(project => 
+        project.id === projectId ? { ...project, name: newName } : project
+      )
+    );
+  };
+
+  const handleNewChat = () => {
+    // Generate a new project with a default name
+    const newId = Date.now();
+    const newProject = {
+      id: newId,
+      name: 'New Chat'
+    };
+    setProjects(prevProjects => [...prevProjects, newProject]);
   };
 
   // You can use config.apiKey here or in any API calls
@@ -24,8 +44,8 @@ function App() {
 
   return (
     <div className="App">
-      <Sidebar projects={projects} />
-      <Chat onNewProject={addNewProject} />
+      <Sidebar projects={projects} onNewChat={handleNewChat} />
+      <Chat onNewProject={addNewProject} onUpdateProject={updateProject} />
     </div>
   );
 }
