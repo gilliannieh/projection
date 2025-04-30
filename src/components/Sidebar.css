@@ -42,7 +42,7 @@
   background-color: #3a6b41;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   font-family: 'Inter', sans-serif;
   font-size: 14px;
   font-weight: 900;
@@ -54,7 +54,6 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-
 }
 
 .new-chat-button:hover {
