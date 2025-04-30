@@ -1,13 +1,21 @@
 import React, { useState } from 'react';
 import './Chat.css';
 
-function Chat() {
+function Chat({ onNewProject }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
+  const [currentProject, setCurrentProject] = useState(null);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (input.trim()) {
+      if (!currentProject) {
+        // If this is the first message, create a new project
+        const projectName = input.length > 20 ? input.substring(0, 20) + '...' : input;
+        onNewProject(projectName);
+        setCurrentProject(projectName);
+      }
+      
       setMessages([...messages, { text: input, sender: 'user' }]);
       setInput('');
       // Here you would typically make an API call to get the response
@@ -39,7 +47,7 @@ function Chat() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Tell us about your project"
+            placeholder={currentProject ? "What's your idea?" : "Tell us about your project"}
             className="chat-input"
           />
           <button type="submit" className="send-button" aria-label="Send">

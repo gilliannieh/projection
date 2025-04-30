@@ -1,13 +1,7 @@
 import React from 'react';
 import './Sidebar.css';
 
-function Sidebar() {
-  const projects = [
-    { id: 1, name: 'Gazebo' },
-    { id: 2, name: 'Garden shed' },
-    { id: 3, name: 'Beach watercolor' },
-  ];
-
+function Sidebar({ projects }) {
   return (
     <div className="sidebar">
       <div className="sidebar-title">Projection</div>

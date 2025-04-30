@@ -3,7 +3,7 @@
   height: 100vh;
   background: #f4f1ea;
   color: #222;
-  padding: 2.5rem 1.5rem 1.5rem 2.5rem;
+  padding: 3rem 2rem 2rem 1.5rem;
   display: flex;
   flex-direction: column;
   font-family: 'Inter', sans-serif;
@@ -11,58 +11,113 @@
 }
 
 .sidebar-title {
-  font-family: 'Playfair Display', serif;
+  font-family: 'Instrument Serif', serif;
   color: #3a6b41;
   font-size: 2rem;
   font-weight: 500;
-  margin-bottom: 2.5rem;
+  margin-bottom: 3rem;
+  padding-left: 0;
 }
 
 .sidebar-label {
   font-size: 0.75rem;
   color: #7b8a7a;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
   font-family: 'Inter', sans-serif;
   font-variant: small-caps;
-  margin-bottom: 0.75rem;
+  font-weight: 900;
+  margin-bottom: 1.25rem;
+  padding-left: 0;
 }
 
 .new-chat {
-  margin-bottom: 1rem;
+  margin-bottom: 2rem;
+  padding-left: 0;
 }
 
 .new-chat-button {
   width: 100%;
-  padding: 0.75rem;
-  background-color: #343541;
+  padding: 0.75rem 1rem;
+  background-color: #3a6b41;
   color: white;
-  border: 1px solid #565869;
-  border-radius: 0.375rem;
+  border: none;
+  border-radius: 0.5rem;
   cursor: pointer;
   font-size: 0.875rem;
-  transition: background-color 0.2s;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
 }
 
 .new-chat-button:hover {
-  background-color: #40414f;
+  background-color: #2d5533;
+  transform: translateY(-1px);
+}
+
+.new-chat-button:active {
+  transform: translateY(0);
 }
 
 .project-list {
   flex: 1;
   overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.project-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.project-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.project-list::-webkit-scrollbar-thumb {
+  background: #d1c9b8;
+  border-radius: 3px;
+}
+
+.project-list::-webkit-scrollbar-thumb:hover {
+  background: #b8b0a0;
 }
 
 .project-item {
-  font-size: 1rem;
+  font-size: 0.95rem;
   color: #222;
-  padding: 0.2rem 0;
-  margin-bottom: 0.2rem;
-  border-radius: 0.375rem;
+  padding: 1rem 1rem 1rem 1rem;
+  margin-bottom: 0.5rem;
+  border-radius: 0.5rem;
   cursor: pointer;
   font-family: 'Inter', sans-serif;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
+  position: relative;
 }
 
 .project-item:hover {
   background: #ece8df;
-} 
+  transform: translateX(4px);
+}
+
+.project-item:active {
+  transform: translateX(0);
+}
+
+.project-item::before {
+  content: '';
+  position: absolute;
+  left: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 0;
+  background: #3a6b41;
+  border-radius: 2px;
+  transition: height 0.2s ease;
+}
+
+.project-item:hover::before {
+  height: 60%;
+}
