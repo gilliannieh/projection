@@ -1,6 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Configuration, OpenAIApi } from 'openai';
+import OpenAI from 'openai';
 import './Chat.css';
+
+// Initialize OpenAI client once outside the component
+const apiKey = process.env.REACT_APP_API_KEY;
+console.log('API Key loaded:', apiKey ? 'Yes' : 'No');
+
+if (!apiKey) {
+  console.error('Error: API key is missing. Please check your .env file.');
+}
+
+const openai = new OpenAI({
+  apiKey: apiKey,
+  dangerouslyAllowBrowser: true
+});
 
 const Chat = () => {
   const [messages, setMessages] = useState([]);
@@ -17,11 +30,13 @@ const Chat = () => {
     scrollToBottom();
   }, [messages]);
 
-  const configuration = new Configuration({
-    apiKey: process.env.REACT_APP_OPENAI_API_KEY,
-  });
-
-  const openai = new OpenAIApi(configuration);
+  if (!apiKey) {
+    return (
+      <div className="error-message">
+        Error: API key is missing. Please check your .env file.
+      </div>
+    );
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,7 +49,8 @@ const Chat = () => {
     setError(null);
 
     try {
-      const completion = await openai.createChatCompletion({
+      console.log('Sending request to OpenAI...');
+      const completion = await openai.chat.completions.create({
         model: 'gpt-3.5-turbo',
         messages: [
           {
@@ -46,15 +62,17 @@ const Chat = () => {
         ],
       });
 
+      console.log('OpenAI response:', completion);
+
       const assistantMessage = {
         role: 'assistant',
-        content: completion.data.choices[0].message.content,
+        content: completion.choices[0].message.content,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err) {
-      setError('Sorry, there was an error processing your request. Please try again.');
-      console.error('Error:', err);
+      console.error('Detailed error:', err);
+      setError(`Error: ${err.message || 'Failed to process request'}`);
     } finally {
       setIsLoading(false);
     }
