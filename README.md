@@ -2,9 +2,7 @@
 
 # Description
 
-
 # Setup
 Create a .env.local file with your OpenAI API key assigned to REACT_APP_API_KEY.
 
-# Install
-Run npm install react-markdown for the response formatting
+Run npm install react-markdown to install the react-markdown package for response formatting.
