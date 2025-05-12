@@ -142,6 +142,33 @@
   padding: 1rem;
 }
 
+/* Markdown styles */
+.message.assistant h3 {
+  color: #3a6b41;
+  font-size: 1.2rem;
+  margin: 1rem 0 0.5rem 0;
+  font-weight: 600;
+}
+
+.message.assistant strong {
+  color: #3a6b41;
+  font-weight: 600;
+}
+
+.message.assistant ul,
+.message.assistant ol {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.message.assistant li {
+  margin: 0.25rem 0;
+}
+
+.message.assistant p {
+  margin: 0.5rem 0;
+}
+
 .typing-indicator {
   display: flex;
   gap: 0.5rem;
