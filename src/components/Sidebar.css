@@ -121,3 +121,25 @@
 .project-item:hover::before {
   height: 60%;
 }
+
+.erase-chat-btn {
+  display: none;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #b8b0a0;
+  font-size: 1.1em;
+  cursor: pointer;
+  padding: 0 4px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+  z-index: 2;
+}
+
+.project-item:hover .erase-chat-btn {
+  display: inline;
+  opacity: 1;
+}

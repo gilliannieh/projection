@@ -1,51 +1,107 @@
 import './App.css';
 import Sidebar from './components/Sidebar';
 import Chat from './components/Chat';
-import config from './config';
 import { useState } from 'react';
+import OpenAI from 'openai';
+
+const apiKey = process.env.REACT_APP_API_KEY;
+const openai = apiKey ? new OpenAI({
+  apiKey: apiKey,
+  dangerouslyAllowBrowser: true
+}) : null;
+
+const initialConversation = () => ({
+  messages: [],
+  timestamp: new Date().toISOString(),
+  title: undefined
+});
 
 function App() {
-  const [projects, setProjects] = useState([
-    { id: 1, name: 'Gazebo' },
-    { id: 2, name: 'Garden shed' },
-    { id: 3, name: 'Beach watercolor' },
-  ]);
-
-  const addNewProject = (projectName) => {
-    // Generate a unique ID based on timestamp
-    const newId = Date.now();
-    const newProject = {
-      id: newId,
-      name: projectName
-    };
-    setProjects(prevProjects => [...prevProjects, newProject]);
-  };
-
-  const updateProject = (projectId, newName) => {
-    setProjects(prevProjects => 
-      prevProjects.map(project => 
-        project.id === projectId ? { ...project, name: newName } : project
-      )
-    );
-  };
+  const [conversations, setConversations] = useState([initialConversation()]);
+  const [activeConversation, setActiveConversation] = useState(0);
 
   const handleNewChat = () => {
-    // Generate a new project with a default name
-    const newId = Date.now();
-    const newProject = {
-      id: newId,
-      name: 'New Chat'
-    };
-    setProjects(prevProjects => [...prevProjects, newProject]);
+    setConversations(prev => [initialConversation(), ...prev]);
+    setActiveConversation(0);
   };
 
-  // You can use config.apiKey here or in any API calls
-  console.log('API Key loaded:', config.apiKey ? 'Yes' : 'No');
+  const handleSelectConversation = (index) => {
+    setActiveConversation(index);
+  };
+
+  // Add a message (user or assistant) to the active conversation
+  const handleAddMessage = async (msg) => {
+    setConversations(prev => {
+      const updated = [...prev];
+      updated[activeConversation] = {
+        ...updated[activeConversation],
+        messages: [...updated[activeConversation].messages, msg]
+      };
+      return updated;
+    });
+
+    // If this is the first assistant response, generate a title
+    if (msg.role === 'assistant') {
+      const conv = conversations[activeConversation];
+      if (!conv.title) {
+        try {
+          if (!openai) return;
+          const userMsg = conv.messages.find(m => m.role === 'user');
+          if (!userMsg) return;
+          const titlePrompt = `Summarize the following home renovation conversation in 3 words or less for a sidebar title. Be specific (e.g., 'Gazebo Renovation', 'Kitchen Remodel', 'Bathroom Tile').\n\nConversation:\n${userMsg.content}`;
+          const completion = await openai.chat.completions.create({
+            model: 'gpt-3.5-turbo',
+            messages: [
+              { role: 'system', content: 'You are a helpful assistant that creates short, specific sidebar titles for home renovation conversations.' },
+              { role: 'user', content: titlePrompt }
+            ],
+            max_tokens: 12,
+            temperature: 0.5
+          });
+          const aiTitle = completion.choices[0].message.content.trim().replace(/^["']|["']$/g, '');
+          setConversations(prev => {
+            const updated = [...prev];
+            updated[activeConversation] = {
+              ...updated[activeConversation],
+              title: aiTitle
+            };
+            return updated;
+          });
+        } catch (err) {
+          // Fallback: do nothing if title generation fails
+        }
+      }
+    }
+  };
+
+  // Delete a conversation and update activeConversation if needed
+  const handleDeleteConversation = (idx) => {
+    setConversations(prev => {
+      const updated = prev.filter((_, i) => i !== idx);
+      if (updated.length === 0) {
+        setActiveConversation(0);
+      } else if (idx === activeConversation) {
+        setActiveConversation(0);
+      } else if (idx < activeConversation) {
+        setActiveConversation(activeConversation - 1);
+      }
+      return updated;
+    });
+  };
 
   return (
     <div className="App">
-      <Sidebar projects={projects} onNewChat={handleNewChat} />
-      <Chat onNewProject={addNewProject} onUpdateProject={updateProject} />
+      <Sidebar
+        conversations={conversations}
+        activeConversation={activeConversation}
+        onSelectConversation={handleSelectConversation}
+        onNewChat={handleNewChat}
+        onDeleteConversation={handleDeleteConversation}
+      />
+      <Chat
+        messages={conversations[activeConversation]?.messages || []}
+        onSendMessage={handleAddMessage}
+      />
     </div>
   );
 }
