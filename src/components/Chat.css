@@ -114,7 +114,7 @@
 
 .message {
   max-width: 80%;
-  padding: 1rem;
+  padding: 0.5rem 1rem;
   margin: 0.5rem 0;
   border-radius: 8px;
   font-family: 'Inter', sans-serif;
@@ -128,6 +128,16 @@
   color: white;
   margin-left: auto;
   text-align: right;
+  padding: 1rem;
+  margin: 0.25rem 0;
+  line-height: 1.4;
+  align-self: flex-end;
+  max-width: 70%;
+}
+
+.message.user p {
+  margin: 0;
+  text-align: right;
 }
 
 .message.assistant {
@@ -135,6 +145,8 @@
   color: #222;
   margin-right: auto;
   text-align: left;
+  align-self: flex-start;
+  max-width: 70%;
 }
 
 .message.assistant.loading {
@@ -146,27 +158,63 @@
 .message.assistant h3 {
   color: #3a6b41;
   font-size: 1.2rem;
-  margin: 1rem 0 0.5rem 0;
+  margin: 1.5rem 0 0.75rem 0;
   font-weight: 600;
+  border-bottom: 2px solid #e0ddd6;
+  padding-bottom: 0.5rem;
 }
 
 .message.assistant strong {
   color: #3a6b41;
   font-weight: 600;
+  display: block;
+  margin: 1rem 0 0.5rem 0;
 }
 
 .message.assistant ul,
 .message.assistant ol {
-  margin: 0.5rem 0;
+  margin: 0.75rem 0;
   padding-left: 1.5rem;
 }
 
 .message.assistant li {
-  margin: 0.25rem 0;
+  margin: 0.5rem 0;
+  line-height: 1.6;
 }
 
 .message.assistant p {
-  margin: 0.5rem 0;
+  margin: 0.75rem 0;
+  line-height: 1.6;
+  text-align: left;
+}
+
+.message.assistant code {
+  background-color: #f8f8f8;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9em;
+}
+
+.message.assistant pre {
+  background-color: #f8f8f8;
+  padding: 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.message.assistant pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.message.assistant blockquote {
+  border-left: 4px solid #3a6b41;
+  margin: 1rem 0;
+  padding-left: 1rem;
+  color: #666;
+  font-style: italic;
 }
 
 .typing-indicator {
