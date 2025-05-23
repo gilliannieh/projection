@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import OpenAI from 'openai';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import './Chat.css';
 
 const apiKey = process.env.REACT_APP_API_KEY;
@@ -56,15 +57,15 @@ function Chat({ messages, onSendMessage }) {
 
           Motivation or purpose (infer if possible—avoid asking directly unless necessary)
 
-          Ask your questions one by one. Wait for the user’s response to a single question before moving on.
+          Ask your questions one by one. Wait for the user's response to a single question before moving on.
 
           If the user asks a question first, answer it before continuing with your guidance.
 
           If the user strays from the project topic, politely refocus them on the task at hand.
 
           Ask the user to confirm the details you have gathered before continuing to provide tools, materials, and directions.
-          Once you’ve gathered enough information, confirm your understanding of the project with the user. Example:
-          “Got it — just to confirm, you’re planning to build a [project] in your [location], with [constraints or considerations]. Is that correct? Ready for the materials and step-by-step directions?”
+          Once you've gathered enough information, confirm your understanding of the project with the user. Example:
+          "Got it — just to confirm, you're planning to build a [project] in your [location], with [constraints or considerations]. Is that correct? Ready for the materials and step-by-step directions?"
 
           Only after receiving confirmation should you provide the next section.
 
@@ -74,6 +75,13 @@ function Chat({ messages, onSendMessage }) {
           - Follow with detailed step-by-step instructions (use numbered lists).
           - Use bold for section headers and ### for major sections.
           - Use markdown formatting for the response. Keep it concise and to the point.
+          - Include relevant image URLs using markdown image syntax ![alt text](image_url) to show what the end result should look like. 
+          - For images, ALWAYS use complete Unsplash URLs with these exact parameters:
+            * Base URL: https://images.unsplash.com/photo-[ID]
+            * Required parameters: ?auto=format&fit=crop&w=800&q=80
+            * Example: https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=800&q=80
+          - NEVER use incomplete URLs or URLs without the required parameters
+          - ALWAYS test the image URL before including it in your response
 
           Then, ask them if they need additional resources. If they say yes, then you can suggest websites or blogs that could help. Maybe even YouTube videos. 
 
@@ -126,7 +134,33 @@ function Chat({ messages, onSendMessage }) {
                 key={index}
                 className={`message ${message.role} ${isLoading && index === messages.length - 1 ? 'loading' : ''}`}
               >
-                <ReactMarkdown>{message.content}</ReactMarkdown>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    img: ({node, ...props}) => {
+                      console.log('Rendering image:', props); // Debug log
+                      return (
+                        <img 
+                          {...props} 
+                          style={{
+                            maxWidth: '100%',
+                            height: 'auto',
+                            borderRadius: '8px',
+                            margin: '1rem 0',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                          }}
+                          alt={props.alt || 'Project result image'}
+                          onError={(e) => {
+                            console.error('Image failed to load:', props.src);
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      );
+                    }
+                  }}
+                >
+                  {message.content}
+                </ReactMarkdown>
               </div>
             ))
           )}
