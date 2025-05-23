@@ -10,4 +10,4 @@
 ####### Dependencies ########
 - Run npm install react-markdown to install the react-markdown package for response formatting.
 - Run npm install remark-gfm for better markdown support.
-- Run npm i --save unsplash-js to support unsplash.
+- Run npm i --save unsplash-js to support Unsplash.
