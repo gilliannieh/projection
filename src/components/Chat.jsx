@@ -2,8 +2,8 @@ import React, { useRef, useEffect, useState } from 'react';
 import OpenAI from 'openai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { getImageUrl } from '../services/unsplash';
 import './Chat.css';
+import jsPDF from 'jspdf';
 
 const apiKey = process.env.REACT_APP_API_KEY;
 const openai = apiKey ? new OpenAI({
@@ -11,44 +11,118 @@ const openai = apiKey ? new OpenAI({
   dangerouslyAllowBrowser: true
 }) : null;
 
-// Create a proper React component for image rendering
-const ImageComponent = ({ alt }) => {
-  const [imageUrl, setImageUrl] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+function downloadPDF(planText) {
+  const doc = new jsPDF();
+  let y = 15;
+  const lineHeight = 8;
+  const maxWidth = 180;
 
-  useEffect(() => {
-    const fetchImage = async () => {
-      setIsLoading(true);
-      setError(null);
-      const url = await getImageUrl(alt || 'home renovation');
-      if (url) setImageUrl(url);
-      else setError('No image found');
-      setIsLoading(false);
-    };
-    fetchImage();
-  }, [alt]);
+  // Split by lines for simple markdown parsing
+  const lines = planText.split('\n');
+  doc.setFont('helvetica');
 
-  if (isLoading) return <p style={{ background: '#f5f5f5', padding: '1rem', borderRadius: '8px' }}>Loading image...</p>;
-  if (error) return <p style={{ background: '#fff5f5', color: 'red', padding: '1rem', borderRadius: '8px' }}>{error}</p>;
+  lines.forEach((line, idx) => {
+    // Section headers (### or **Header**)
+    if (line.trim().startsWith('###')) {
+      doc.setFontSize(16);
+      doc.setFont(undefined, 'bold');
+      const wrapped = doc.splitTextToSize(line.replace(/^###\s*/, ''), maxWidth);
+      doc.text(wrapped, 10, y);
+      y += lineHeight * wrapped.length + 2;
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'normal');
+    } else if (/^\*\*(.+)\*\*$/.test(line.trim())) {
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      const wrapped = doc.splitTextToSize(line.replace(/^\*\*|\*\*$/g, ''), maxWidth);
+      doc.text(wrapped, 10, y);
+      y += lineHeight * wrapped.length;
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'normal');
+    } else if (/^\d+\./.test(line.trim())) {
+      // Numbered list
+      const wrapped = doc.splitTextToSize(line, maxWidth);
+      doc.text(wrapped, 15, y);
+      y += lineHeight * wrapped.length;
+    } else if (/^[-*]\s/.test(line.trim())) {
+      // Bulleted list
+      const wrapped = doc.splitTextToSize('• ' + line.replace(/^[-*]\s/, ''), maxWidth);
+      doc.text(wrapped, 15, y);
+      y += lineHeight * wrapped.length;
+    } else if (line.trim() === '---') {
+      // Section divider
+      y += 4;
+      doc.setDrawColor(150);
+      doc.line(10, y, 200, y);
+      y += 6;
+    } else if (line.trim() === '') {
+      y += 2;
+    } else {
+      // Regular text
+      const wrapped = doc.splitTextToSize(line, maxWidth);
+      doc.text(wrapped, 10, y);
+      y += lineHeight * wrapped.length;
+    }
+    // Add new page if needed
+    if (y > 270 && idx < lines.length - 1) {
+      doc.addPage();
+      y = 15;
+    }
+  });
 
-  return (
-    <img
-      src={imageUrl}
-      alt={alt || 'Project image'}
-      style={{ maxWidth: '100%', height: 'auto', borderRadius: '8px', margin: '2 rem 0', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
-    />
-  );
-};
+  doc.save('project-plan.pdf');
+}
+
+// Add a function to extract known info from user messages
+function extractKnownInfo(messages) {
+  const info = {
+    livingSituation: null,
+    physicalLimitations: null,
+    tools: null,
+    noiseRestrictions: null,
+    experience: null,
+    goals: null,
+  };
+
+  messages.forEach(msg => {
+    if (msg.role === 'user') {
+      const text = msg.content.toLowerCase();
+      if (text.includes('apartment') || text.includes('rental') || text.includes('owned')) {
+        info.livingSituation = msg.content;
+      }
+      if (text.includes('no physical limitations') || text.includes('i am') || text.includes('injury') || text.includes('old')) {
+        info.physicalLimitations = msg.content;
+      }
+      if (text.includes('tools') || text.includes('have a drill') || text.includes('saw')) {
+        info.tools = msg.content;
+      }
+      if (text.includes('noise')) {
+        info.noiseRestrictions = msg.content;
+      }
+      if (text.includes('diy') || text.includes('experience')) {
+        info.experience = msg.content;
+      }
+      if (text.includes('goal') || text.includes('want to') || text.includes('my project is')) {
+        info.goals = msg.content;
+      }
+    }
+  });
+
+  let summary = '';
+  if (info.livingSituation) summary += `Living situation: ${info.livingSituation}\n`;
+  if (info.physicalLimitations) summary += `Physical limitations: ${info.physicalLimitations}\n`;
+  if (info.tools) summary += `Tools: ${info.tools}\n`;
+  if (info.noiseRestrictions) summary += `Noise restrictions: ${info.noiseRestrictions}\n`;
+  if (info.experience) summary += `Experience: ${info.experience}\n`;
+  if (info.goals) summary += `Goals: ${info.goals}\n`;
+
+  return summary.trim();
+}
 
 function Chat({ messages, onSendMessage, convTitle }) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [projectContext, setProjectContext] = useState({
-    location: null,   // e.g., "apartment", "backyard", "balcony"
-    type: null,       // e.g., "planter", "bookshelf"
-  });
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -66,109 +140,95 @@ function Chat({ messages, onSendMessage, convTitle }) {
       onSendMessage(userMessage);
       setInput('');
       if (!openai) throw new Error('OpenAI API key missing or OpenAI not initialized.');
+      // Extract known info from conversation
+      const knownInfoSummary = extractKnownInfo([...messages, userMessage]);
       // Prepare messages for OpenAI
       const openaiMessages = [
         {
           role: 'system',
-          content: `You are a helpful assistant specializing in guiding users on what home renovation projects to pursue and how to complete them step by step.
+          content: `You are a safety-conscious and practical home renovation assistant. Your job is to help users make smart, safe, and feasible decisions about their projects.
 
-          You focus on projects that can be completed in a day or two and do not damage the home. If they suggest a project that is not renter-friendly, suggest a more feasible alternative or options to build it safely.
+Known information from the conversation so far:
+${knownInfoSummary || 'None yet.'}
 
-          You draw on internet knowledge (e.g., YouTube videos, Reddit posts, blogs) and apply principles from cognitive load theory, problem solving, and instructional design to break down complex projects into clear, actionable steps.
+**Conversational Guidelines:**
+- Ask only one clarifying question at a time.
+- Wait for the user's answer before asking the next question.
+- If the user says "I'm not sure" or gives a vague answer, ask a follow-up question to help them clarify (e.g., "Can you tell me more about your living space?" or "What are your main goals for this project?").
+- Keep narrowing down the idea until you have enough information to make a safe, practical recommendation.
+- If the user continues to be unsure, gently suggest options or examples to help them decide.
+- Only after you have gathered enough details, summarize your understanding and ask for confirmation before generating a project plan.
 
-          Ask one by one questions to determine requirements for the project: restrictions based on their home, materials, budget, and skill level for the project depending on the user's goals and the project they are trying to build.
+**Safety and Feasibility:**
+- Always assess project feasibility and user safety.
+- If a project is unsafe or impractical, explain why and suggest safer alternatives.
+- Consider the user's living situation (apartment, rental, owned home), physical capabilities and age, available space and tools, noise restrictions, building codes, and potential property damage.
 
-          If the user is unsure, ask the user guided questions one by one. Dynamically determine the requirements for the project based on the user's responses.
+**Strict Safety and Feasibility Policy:**
+- If the user proposes a project that is likely to be impractical, unsafe, or disruptive (such as building large furniture from scratch in an apartment, or any project that could cause noise, damage, or require specialized tools), you must:
+  - Clearly explain why this is not recommended.
+  - Strongly discourage proceeding with the original idea.
+  - Offer safer, more practical alternatives (such as buying a flat-pack desk, using a makerspace, or hiring a professional).
+  - Only proceed with planning if the user insists and confirms they understand the risks and limitations.
+- Never encourage or support projects that could violate building codes, rental agreements, or pose safety risks.
 
-          Be comprehensive. Get as much information as possible about the user and their goals.
+**When ready to generate a plan:**
+- Confirm the details with the user.
+- Provide a clear, step-by-step project plan with materials, tools, and instructions.
+- Break down into clear, manageable steps
+- Highlight safety precautions
+- Suggest appropriate tools and materials
+- Provide alternative approaches for different skill levels
+- Include relevant safety warnings and precautions
+- Always prioritize user safety, property protection, legal compliance, practical feasibility, and cost-effectiveness.
 
-          Ask your questions one by one. Wait for the user's response to a single question before moving on.
+**Examples of good responses:**
+- "Building a desk from scratch in an apartment might be challenging due to space constraints and noise. Instead, I'd recommend:
+   a) Purchasing a flat-pack desk from IKEA or similar
+   b) Visiting a local makerspace or woodshop
+   c) Hiring a carpenter for custom work
+  Which option interests you most?"
 
-          If the user asks a question first, answer it before continuing with your guidance.
+- "As an 80-year-old, building a gazebo might be physically demanding. Instead, consider:
+   a) Hiring a contractor
+   b) Purchasing a pre-assembled gazebo
+   c) Enlisting help from family or community services
+  Would you like to explore any of these options?"
 
-          If the user strays from the project topic, politely refocus them on the task at hand.
+- "Storing plates in a hole in the backyard isn't recommended due to moisture and pest issues. Instead, consider:
+   a) Installing proper kitchen cabinets
+   b) Using a storage unit
+   c) Donating unused items
+  What would work best for your situation?"
 
-          Ask the user to confirm the details you have gathered before continuing on to provide materials and directions.
-          
-          Then, provide tools, materials, and directions.
-          Once you've gathered enough information, confirm your understanding of the project with the user. Example:
-          "Got it — just to confirm, you're planning to build a [project] in your [location], with [constraints or considerations]. Is that correct? Ready for the materials and step-by-step directions?"
+**When the user confirms the details, provide the following:**
+- Give a clear materials list first (use bullets)
+- Give a clear tools list (use bullets)
+- Follow with detailed step-by-step instructions (use numbered lists)
+- Use bold for section headers and ### for major sections
+- Use markdown formatting for the response
 
-          Only after asking for confirmation of the details should you provide the next section. 
-
-          When the user confirms the details, provide the following:
-          - Give a clear materials list first (use bullets).
-          - Give a clear tools list (use bullets).
-          - Follow with detailed step-by-step instructions (use numbered lists).
-          - Use bold for section headers and ### for major sections.
-          - Use markdown formatting for the response. Keep it concise and to the point.
-          - Include relevant images using markdown image syntax ![alt text](image_url) to show what the end result should look like.
-          - For images, use descriptive alt text that will help find relevant images (e.g., "modern kitchen renovation with white cabinets" or "small apartment balcony garden with herbs")
-          - The system will automatically fetch appropriate images from Unsplash based on the alt text.
-
-          Always include a placeholder like: {{unsplash:<search_term>}} in markdown format when providing the directions and materials.
-          The system will replace this placeholder with a real Unsplash image during rendering.
-
-          Then, ask them if they need additional resources. If they say yes, then you can suggest websites or blogs that could help. Maybe even YouTube videos. 
-          Also ask them if they want a shopping list. If they do, then you can suggest a shopping list with links to the items after asking their preferred store.
-
-          Do not support unrealistic or unsafe projects.
-
-          If the user proposes something impractical (e.g., due to lack of space, noise concerns, or required tools), guide them toward more feasible alternatives (e.g., modular or prebuilt solutions).
-
-          If the project requires advanced skills or tools and the user is in a small/shared space, suggest simpler DIY kits or off-the-shelf options from IKEA, Home Depot, Wayfair, etc.
-
-          Always prioritize clarity, realism, and user safety. Guide the user toward successful and achievable outcomes.`
+Then, ask them if they need additional resources. If they say yes, then you can suggest websites or blogs that could help. Maybe even YouTube videos. Also ask them if they want a shopping list. If they do, then you can suggest a shopping list with links to the items after asking their preferred store.`
         },
         ...messages,
         userMessage
       ];
       // Call OpenAI
       const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: openaiMessages
-    });
+        model: 'gpt-3.5-turbo',
+        messages: openaiMessages
+      });
 
-    let assistantResponse = completion.choices[0].message.content;
+      const assistantResponse = completion.choices[0].message.content;
 
-    // 1: Extract context from response
-    const extractProjectContext = (content) => {
-      const locationMatch = content.match(/(?:apartment|backyard|balcony|living room|bedroom|kitchen|deck|patio|garden|home|office)/i);
-      const typeMatch = content.match(/(?:build|make|create|design|plan) (?:a|an)?\s?([a-zA-Z\s]+)/i);
-
-      return {
-        location: locationMatch?.[0]?.toLowerCase() || null,
-        type: typeMatch?.[1]?.toLowerCase().trim() || null,
+      // Send message
+      const assistantMessage = {
+        role: 'assistant',
+        content: assistantResponse
       };
-    };
+      onSendMessage(assistantMessage);
 
-    const context = extractProjectContext(assistantResponse);
-    setProjectContext(prev => ({ ...prev, ...context }));
-
-    // 2: Build a smarter search term
-    const searchTerm = `${context.type || convTitle || 'home renovation'} in a ${context.location || 'small space'}`;
-
-    // 3: Fetch from Unsplash
-    const response = await fetch(
-      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(searchTerm)}&client_id=${process.env.REACT_APP_UNSPLASH_API_KEY}`
-    );
-    const data = await response.json();
-    const imageUrl = data.results[0]?.urls?.regular;
-
-    // 4: Replace placeholder
-    assistantResponse = assistantResponse.replace(
-      /\{\{unsplash:(.+?)\}\}/i,
-      `![${searchTerm}](${imageUrl})`
-    );
-
-    // 5: Send message
-    const assistantMessage = {
-      role: 'assistant',
-      content: assistantResponse
-    };
-    onSendMessage(assistantMessage);
-
-    setIsLoading(false);
+      setIsLoading(false);
     } catch (err) {
       setError('Failed to get assistant response.');
       setIsLoading(false);
@@ -197,7 +257,6 @@ function Chat({ messages, onSendMessage, convTitle }) {
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
-                    img: ({ alt }) => <ImageComponent alt={alt} />,
                     a: ({ href, children }) => (
                       <a
                         href={href}
@@ -212,7 +271,6 @@ function Chat({ messages, onSendMessage, convTitle }) {
                 >
                   {message.content}
                 </ReactMarkdown>
-
               </div>
             ))
           )}
@@ -241,6 +299,29 @@ function Chat({ messages, onSendMessage, convTitle }) {
             </svg>
           </button>
         </form>
+        <button
+          onClick={() => {
+            // Gather all assistant messages that are part of the project plan or shopping list
+            const relevantMessages = messages.filter(
+              m =>
+                m.role === 'assistant' &&
+                (
+                  m.content.toLowerCase().includes('materials') ||
+                  m.content.toLowerCase().includes('tools') ||
+                  m.content.toLowerCase().includes('step-by-step') ||
+                  m.content.toLowerCase().includes('project plan') ||
+                  m.content.toLowerCase().includes('shopping list')
+                )
+            );
+            // Fallback: if nothing matches, use the last assistant message
+            const pdfContent = relevantMessages.length > 0
+              ? relevantMessages.map(m => m.content).join('\n\n---\n\n')
+              : (messages.slice().reverse().find(m => m.role === 'assistant')?.content || 'No project plan available yet.');
+            downloadPDF(pdfContent);
+          }}
+        >
+          Download Project Plan as PDF
+        </button>
       </div>
     </div>
   );
