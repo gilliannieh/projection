@@ -11,64 +11,172 @@ const openai = apiKey ? new OpenAI({
   dangerouslyAllowBrowser: true
 }) : null;
 
-function downloadPDF(planText) {
+function downloadPDF(planText, title) {
   const doc = new jsPDF();
   let y = 15;
   const lineHeight = 8;
   const maxWidth = 180;
+  const pageHeight = 270;
+  const margin = 10;
 
   // Split by lines for simple markdown parsing
   const lines = planText.split('\n');
   doc.setFont('helvetica');
 
+  // Add title
+  doc.setFontSize(20);
+  doc.setFont(undefined, 'bold');
+  doc.text(`${title} Plan`, margin, y);
+  y += lineHeight * 2;
+  doc.setFontSize(12);
+  doc.setFont(undefined, 'normal');
+
+  // Extract and format sections
+  let currentSection = '';
+  let sectionContent = [];
+  let skipSection = true;
+
+  const addNewPage = () => {
+    doc.addPage();
+    y = margin;
+  };
+
+  const processText = (text, x, y) => {
+    // Split text by bold markers
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    let currentY = y;
+
+    parts.forEach(part => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        // Bold text
+        const boldText = part.slice(2, -2);
+        doc.setFont(undefined, 'bold');
+        const wrapped = doc.splitTextToSize(boldText, maxWidth);
+        
+        // Check if we need a new page
+        if (currentY + (wrapped.length * lineHeight) > pageHeight) {
+          addNewPage();
+          currentY = margin;
+        }
+        
+        doc.text(wrapped, x, currentY);
+        currentY += wrapped.length * lineHeight;
+      } else if (part.trim()) {
+        // Regular text
+        doc.setFont(undefined, 'normal');
+        const wrapped = doc.splitTextToSize(part, maxWidth);
+        
+        // Check if we need a new page
+        if (currentY + (wrapped.length * lineHeight) > pageHeight) {
+          addNewPage();
+          currentY = margin;
+        }
+        
+        doc.text(wrapped, x, currentY);
+        currentY += wrapped.length * lineHeight;
+      }
+    });
+
+    return currentY;
+  };
+
   lines.forEach((line, idx) => {
-    // Section headers (### or **Header**)
-    if (line.trim().startsWith('###')) {
-      doc.setFontSize(16);
-      doc.setFont(undefined, 'bold');
-      const wrapped = doc.splitTextToSize(line.replace(/^###\s*/, ''), maxWidth);
-      doc.text(wrapped, 10, y);
-      y += lineHeight * wrapped.length + 2;
-      doc.setFontSize(12);
-      doc.setFont(undefined, 'normal');
-    } else if (/^\*\*(.+)\*\*$/.test(line.trim())) {
-      doc.setFontSize(14);
-      doc.setFont(undefined, 'bold');
-      const wrapped = doc.splitTextToSize(line.replace(/^\*\*|\*\*$/g, ''), maxWidth);
-      doc.text(wrapped, 10, y);
-      y += lineHeight * wrapped.length;
-      doc.setFontSize(12);
-      doc.setFont(undefined, 'normal');
-    } else if (/^\d+\./.test(line.trim())) {
-      // Numbered list
-      const wrapped = doc.splitTextToSize(line, maxWidth);
-      doc.text(wrapped, 15, y);
-      y += lineHeight * wrapped.length;
-    } else if (/^[-*]\s/.test(line.trim())) {
-      // Bulleted list
-      const wrapped = doc.splitTextToSize('• ' + line.replace(/^[-*]\s/, ''), maxWidth);
-      doc.text(wrapped, 15, y);
-      y += lineHeight * wrapped.length;
-    } else if (line.trim() === '---') {
-      // Section divider
-      y += 4;
-      doc.setDrawColor(150);
-      doc.line(10, y, 200, y);
-      y += 6;
-    } else if (line.trim() === '') {
-      y += 2;
-    } else {
-      // Regular text
-      const wrapped = doc.splitTextToSize(line, maxWidth);
-      doc.text(wrapped, 10, y);
-      y += lineHeight * wrapped.length;
-    }
-    // Add new page if needed
-    if (y > 270 && idx < lines.length - 1) {
-      doc.addPage();
-      y = 15;
+    const trimmedLine = line.trim();
+    
+    // Check for section headers
+    if (trimmedLine.startsWith('###') || /^\*\*(.+)\*\*$/.test(trimmedLine)) {
+      // Process previous section if it was materials, tools, directions, or steps
+      if (!skipSection && sectionContent.length > 0) {
+        // Check if we need a new page for the section header
+        if (y + lineHeight * 3 > pageHeight) {
+          addNewPage();
+        }
+
+        // Add section header
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'bold');
+        const wrapped = doc.splitTextToSize(currentSection, maxWidth);
+        doc.text(wrapped, margin, y);
+        y += lineHeight * wrapped.length + 2;
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'normal');
+
+        // Add section content
+        sectionContent.forEach(content => {
+          if (content.trim() === '') {
+            y += lineHeight;
+            if (y > pageHeight) {
+              addNewPage();
+            }
+          } else if (/^\d+\./.test(content.trim())) {
+            // Numbered list - keep number and content together
+            y = processText(content, margin, y);
+          } else if (/^[-*]\s/.test(content.trim())) {
+            // Bulleted list
+            const bulletContent = '• ' + content.replace(/^[-*]\s/, '');
+            y = processText(bulletContent, margin, y);
+          } else {
+            // Regular text
+            y = processText(content, margin, y);
+          }
+        });
+        y += lineHeight;
+      }
+
+      // Start new section
+      currentSection = trimmedLine.replace(/^###\s*|\*\*/g, '');
+      sectionContent = [];
+      
+      // Determine if we should include this section
+      const lowerSection = currentSection.toLowerCase();
+      skipSection = !(
+        lowerSection.includes('materials') ||
+        lowerSection.includes('tools') ||
+        lowerSection.includes('directions') ||
+        lowerSection.includes('instructions') ||
+        lowerSection.includes('steps') || 
+        lowerSection.includes('step') ||
+        lowerSection.includes('safety')
+      );
+    } else if (!skipSection) {
+      sectionContent.push(line);
     }
   });
+
+  // Process the last section
+  if (!skipSection && sectionContent.length > 0) {
+    // Check if we need a new page for the section header
+    if (y + lineHeight * 3 > pageHeight) {
+      addNewPage();
+    }
+
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    const wrapped = doc.splitTextToSize(currentSection, maxWidth);
+    doc.text(wrapped, margin, y);
+    y += lineHeight * wrapped.length + 2;
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'normal');
+
+    sectionContent.forEach(content => {
+      if (content.trim() === '') {
+        y += lineHeight;
+        if (y > pageHeight) {
+          addNewPage();
+        }
+      } else if (/^\d+\./.test(content.trim())) {
+        // Numbered list - keep number and content together
+        y = processText(content, margin, y);
+      } else if (/^[-*]\s/.test(content.trim())) {
+        // Bulleted list
+        const bulletContent = '• ' + content.replace(/^[-*]\s/, '');
+        y = processText(bulletContent, margin, y);
+      } else {
+        // Regular text
+        y = processText(content, margin, y);
+      }
+    });
+  }
 
   doc.save('project-plan.pdf');
 }
@@ -129,6 +237,21 @@ function Chat({ messages, onSendMessage, convTitle }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const hasProjectPlan = () => {
+    // Check if there are any assistant messages
+    const assistantMessages = messages.filter(msg => msg.role === 'assistant');
+    if (assistantMessages.length === 0) return false;
+
+    // Get the last assistant message
+    const lastMessage = assistantMessages[assistantMessages.length - 1].content.toLowerCase();
+    
+    // Check if the message contains materials, tools, and steps
+    const hasMaterials = lastMessage.includes('materials') || lastMessage.includes('tools');
+    const hasSteps = lastMessage.includes('step') || lastMessage.includes('instructions');
+    
+    return hasMaterials && hasSteps;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!input.trim()) return;
@@ -175,9 +298,10 @@ ${knownInfoSummary || 'None yet.'}
 **When ready to generate a plan:**
 - Confirm the details with the user.
 - Provide a clear, step-by-step project plan with materials, tools, and instructions.
-- Break down into clear, manageable steps
+- Break down into clear, manageable steps in a section called "Steps"
 - Highlight safety precautions
 - Suggest appropriate tools and materials
+- Suggest tools and skills needed for the project at each step
 - Provide alternative approaches for different skill levels
 - Include relevant safety warnings and precautions
 - Always prioritize user safety, property protection, legal compliance, practical feasibility, and cost-effectiveness.
@@ -235,6 +359,22 @@ Then, ask them if they need additional resources. If they say yes, then you can 
     }
   };
 
+  const handleDownloadPDF = () => {
+    // Get the last assistant message that contains the project plan
+    const assistantMessages = messages
+      .filter(msg => msg.role === 'assistant')
+      .map(msg => msg.content);
+    
+    const lastMessage = assistantMessages[assistantMessages.length - 1];
+    
+    if (lastMessage) {
+      // Use convTitle if available, otherwise use "Project"
+      console.log("Title: ",convTitle);
+      const title = convTitle || "Project";
+      downloadPDF(lastMessage, title);
+    }
+  };
+
   if (!apiKey) {
     return <div className="error-message">Error: API key is missing. Please check your .env file.</div>;
   }
@@ -242,6 +382,21 @@ Then, ask them if they need additional resources. If they say yes, then you can 
   return (
     <div className="chat-outer-container">
       <div className="chat-inner-container">
+        {hasProjectPlan() && (
+          <div className="chat-header">
+            <button 
+              className="download-pdf-button"
+              onClick={handleDownloadPDF}
+              title="Download project plan as PDF"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 15V3M12 15L8 11M12 15L16 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M2 17L2 21C2 21.5523 2.44772 22 3 22L21 22C21.5523 22 22 21.5523 22 21L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Download Project Plan
+            </button>
+          </div>
+        )}
         <div className="messages">
           {messages.length === 0 ? (
             <div className="welcome-message">
@@ -299,29 +454,6 @@ Then, ask them if they need additional resources. If they say yes, then you can 
             </svg>
           </button>
         </form>
-        <button
-          onClick={() => {
-            // Gather all assistant messages that are part of the project plan or shopping list
-            const relevantMessages = messages.filter(
-              m =>
-                m.role === 'assistant' &&
-                (
-                  m.content.toLowerCase().includes('materials') ||
-                  m.content.toLowerCase().includes('tools') ||
-                  m.content.toLowerCase().includes('step-by-step') ||
-                  m.content.toLowerCase().includes('project plan') ||
-                  m.content.toLowerCase().includes('shopping list')
-                )
-            );
-            // Fallback: if nothing matches, use the last assistant message
-            const pdfContent = relevantMessages.length > 0
-              ? relevantMessages.map(m => m.content).join('\n\n---\n\n')
-              : (messages.slice().reverse().find(m => m.role === 'assistant')?.content || 'No project plan available yet.');
-            downloadPDF(pdfContent);
-          }}
-        >
-          Download Project Plan as PDF
-        </button>
       </div>
     </div>
   );
