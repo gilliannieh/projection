@@ -227,11 +227,25 @@ function extractKnownInfo(messages) {
   return summary.trim();
 }
 
+// Save project to local storage
+function saveProjectToHistory(project) {
+  const history = JSON.parse(localStorage.getItem('projectHistory') || '[]');
+  history.push(project);
+  localStorage.setItem('projectHistory', JSON.stringify(history));
+}
+
+// Read project history
+function getProjectHistory() {
+  return JSON.parse(localStorage.getItem('projectHistory') || '[]');
+}
+
 function Chat({ messages, onSendMessage, convTitle }) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState(getProjectHistory());
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -265,6 +279,11 @@ function Chat({ messages, onSendMessage, convTitle }) {
       if (!openai) throw new Error('OpenAI API key missing or OpenAI not initialized.');
       // Extract known info from conversation
       const knownInfoSummary = extractKnownInfo([...messages, userMessage]);
+      // Get project history for personalization
+      const projectHistory = getProjectHistory();
+      const historySummary = projectHistory.length > 0
+        ? projectHistory.map(p => p.title).join(', ')
+        : '';
       // Prepare messages for OpenAI
       const openaiMessages = [
         {
@@ -273,6 +292,8 @@ function Chat({ messages, onSendMessage, convTitle }) {
 
 Known information from the conversation so far:
 ${knownInfoSummary || 'None yet.'}
+
+User's project history: ${historySummary || 'No previous projects.'}
 
 **Conversational Guidelines:**
 - Ask only one clarifying question at a time.
@@ -298,10 +319,9 @@ ${knownInfoSummary || 'None yet.'}
 **When ready to generate a plan:**
 - Confirm the details with the user.
 - Provide a clear, step-by-step project plan with materials, tools, and instructions.
-- Break down into clear, manageable steps in a section called "Steps"
+- Break down into clear, manageable steps
 - Highlight safety precautions
 - Suggest appropriate tools and materials
-- Suggest tools and skills needed for the project at each step
 - Provide alternative approaches for different skill levels
 - Include relevant safety warnings and precautions
 - Always prioritize user safety, property protection, legal compliance, practical feasibility, and cost-effectiveness.
@@ -378,6 +398,20 @@ Then, ask them if they need additional resources. If they say yes, then you can 
     }
   };
 
+  // Function to delete a project
+  function deleteProject(idx) {
+    const updated = [...history];
+    updated.splice(idx, 1);
+    localStorage.setItem('projectHistory', JSON.stringify(updated));
+    setHistory(updated);
+  }
+
+  // Function to view a project (show its content in a modal or alert)
+  function viewProject(project) {
+    // For now, use alert. You can replace with a nicer modal if you want!
+    alert(project.content);
+  }
+
   if (!apiKey) {
     return <div className="error-message">Error: API key is missing. Please check your .env file.</div>;
   }
@@ -389,7 +423,34 @@ Then, ask them if they need additional resources. If they say yes, then you can 
           <div className="chat-header">
             <button 
               className="download-pdf-button"
-              onClick={handleDownloadPDF}
+              onClick={() => {
+                // Gather all assistant messages that are part of the project plan or shopping list
+                const relevantMessages = messages.filter(
+                  m =>
+                    m.role === 'assistant' &&
+                    (
+                      m.content.toLowerCase().includes('materials') ||
+                      m.content.toLowerCase().includes('tools') ||
+                      m.content.toLowerCase().includes('step-by-step') ||
+                      m.content.toLowerCase().includes('project plan') ||
+                      m.content.toLowerCase().includes('shopping list') ||
+                      m.content.toLowerCase().includes('here is your shopping list')
+                    )
+                );
+                // Fallback: if nothing matches, use the last assistant message
+                const pdfContent = relevantMessages.length > 0
+                  ? relevantMessages.map(m => m.content).join('\n\n---\n\n')
+                  : (messages.slice().reverse().find(m => m.role === 'assistant')?.content || 'No project plan available yet.');
+                // Save project to history if there is content
+                if (relevantMessages.length > 0) {
+                  saveProjectToHistory({
+                    title: relevantMessages[0].content.split('\n')[0].replace(/[#*]+/g, '').trim().slice(0, 50),
+                    content: pdfContent,
+                    timestamp: new Date().toISOString()
+                  });
+                }
+                downloadPDF(pdfContent);
+              }}
               title="Download project plan as PDF"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -458,6 +519,33 @@ Then, ask them if they need additional resources. If they say yes, then you can 
           </button>
         </form>
       </div>
+      <button onClick={() => setShowHistory(true)} style={{ margin: '1rem' }}>
+        View Project History
+      </button>
+      {showHistory && (
+        <div className="history-modal" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="history-content" style={{ background: '#fff', padding: '2rem', borderRadius: '10px', maxWidth: '600px', width: '90%', maxHeight: '80vh', overflowY: 'auto' }}>
+            <h2>Project History</h2>
+            <button onClick={() => setShowHistory(false)} style={{ float: 'right', marginBottom: '1rem' }}>Close</button>
+            {history.length === 0 ? (
+              <p>No saved projects yet.</p>
+            ) : (
+              <ul style={{ listStyle: 'none', padding: 0 }}>
+                {history.map((proj, idx) => (
+                  <li key={proj.timestamp} style={{ marginBottom: '1.5rem', borderBottom: '1px solid #eee', paddingBottom: '1rem' }}>
+                    <strong>{proj.title}</strong> <em>({new Date(proj.timestamp).toLocaleString()})</em>
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <button onClick={() => viewProject(proj)} style={{ marginRight: '0.5rem' }}>View</button>
+                      <button onClick={() => downloadPDF(proj.content)} style={{ marginRight: '0.5rem' }}>Download PDF</button>
+                      <button onClick={() => deleteProject(idx)} style={{ color: 'red' }}>Delete</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
