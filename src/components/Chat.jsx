@@ -130,6 +130,7 @@ function downloadPDF(planText, title) {
       // Determine if we should include this section
       const lowerSection = currentSection.toLowerCase();
       skipSection = !(
+        lowerSection.includes('options') ||
         lowerSection.includes('materials') ||
         lowerSection.includes('tools') ||
         lowerSection.includes('directions') ||
@@ -244,8 +245,6 @@ function Chat({ messages, onSendMessage, convTitle }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
-  const [showHistory, setShowHistory] = useState(false);
-  const [history, setHistory] = useState(getProjectHistory());
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -375,6 +374,25 @@ Then, ask them if they need additional resources. If they say yes, then you can 
       };
       onSendMessage(assistantMessage);
 
+      // Check if this is a complete project plan and save to history
+      const hasMaterials = assistantResponse.toLowerCase().includes('materials') || assistantResponse.toLowerCase().includes('tools');
+      const hasSteps = assistantResponse.toLowerCase().includes('step') || assistantResponse.toLowerCase().includes('instructions');
+      
+      if (hasMaterials && hasSteps) {
+        // Extract title from the first line or use a default
+        const firstLine = assistantResponse.split('\n')[0].replace(/[#*]+/g, '').trim();
+        const title = firstLine || (convTitle || 'Project');
+        
+        saveProjectToHistory({
+          title: title,
+          content: assistantResponse,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Dispatch event to update history in Sidebar
+        window.dispatchEvent(new Event('projectHistoryUpdate'));
+      }
+
       setIsLoading(false);
     } catch (err) {
       setError('Failed to get assistant response.');
@@ -397,20 +415,6 @@ Then, ask them if they need additional resources. If they say yes, then you can 
       downloadPDF(lastMessage, title);
     }
   };
-
-  // Function to delete a project
-  function deleteProject(idx) {
-    const updated = [...history];
-    updated.splice(idx, 1);
-    localStorage.setItem('projectHistory', JSON.stringify(updated));
-    setHistory(updated);
-  }
-
-  // Function to view a project (show its content in a modal or alert)
-  function viewProject(project) {
-    // For now, use alert. You can replace with a nicer modal if you want!
-    alert(project.content);
-  }
 
   if (!apiKey) {
     return <div className="error-message">Error: API key is missing. Please check your .env file.</div>;
@@ -449,7 +453,7 @@ Then, ask them if they need additional resources. If they say yes, then you can 
                     timestamp: new Date().toISOString()
                   });
                 }
-                downloadPDF(pdfContent);
+                downloadPDF(pdfContent, convTitle || "Project");
               }}
               title="Download project plan as PDF"
             >
@@ -519,33 +523,6 @@ Then, ask them if they need additional resources. If they say yes, then you can 
           </button>
         </form>
       </div>
-      <button onClick={() => setShowHistory(true)} style={{ margin: '1rem' }}>
-        View Project History
-      </button>
-      {showHistory && (
-        <div className="history-modal" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="history-content" style={{ background: '#fff', padding: '2rem', borderRadius: '10px', maxWidth: '600px', width: '90%', maxHeight: '80vh', overflowY: 'auto' }}>
-            <h2>Project History</h2>
-            <button onClick={() => setShowHistory(false)} style={{ float: 'right', marginBottom: '1rem' }}>Close</button>
-            {history.length === 0 ? (
-              <p>No saved projects yet.</p>
-            ) : (
-              <ul style={{ listStyle: 'none', padding: 0 }}>
-                {history.map((proj, idx) => (
-                  <li key={proj.timestamp} style={{ marginBottom: '1.5rem', borderBottom: '1px solid #eee', paddingBottom: '1rem' }}>
-                    <strong>{proj.title}</strong> <em>({new Date(proj.timestamp).toLocaleString()})</em>
-                    <div style={{ marginTop: '0.5rem' }}>
-                      <button onClick={() => viewProject(proj)} style={{ marginRight: '0.5rem' }}>View</button>
-                      <button onClick={() => downloadPDF(proj.content)} style={{ marginRight: '0.5rem' }}>Download PDF</button>
-                      <button onClick={() => deleteProject(idx)} style={{ color: 'red' }}>Delete</button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
