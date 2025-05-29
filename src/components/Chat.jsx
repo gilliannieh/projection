@@ -182,6 +182,9 @@ ${knownInfoSummary || 'None yet.'}
 - Include relevant safety warnings and precautions
 - Always prioritize user safety, property protection, legal compliance, practical feasibility, and cost-effectiveness.
 
+**Shopping List Links:**
+- When providing shopping links, use search URLs for the store and product (e.g., "https://www.ikea.com/us/en/search/?query=desk" or "https://www.amazon.com/s?k=desk") instead of direct product links, unless you are certain the direct link is valid.
+
 **Examples of good responses:**
 - "Building a desk from scratch in an apartment might be challenging due to space constraints and noise. Instead, I'd recommend:
    a) Purchasing a flat-pack desk from IKEA or similar
