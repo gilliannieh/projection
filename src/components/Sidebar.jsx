@@ -4,7 +4,7 @@ import './Sidebar.css';
 function Sidebar({ conversations, activeConversation, onSelectConversation, onNewChat, onDeleteConversation }) {
   // Helper to get the title for a conversation
   const getTitle = (conv) => {
-    return conv.title ? conv.title : 'New Chat';
+    return conv.title ? conv.title : 'Project';
   };
 
   return (
@@ -15,7 +15,7 @@ function Sidebar({ conversations, activeConversation, onSelectConversation, onNe
             <path d="M12 5V19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             <path d="M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          New Chat
+          New Project
         </button>
       </div>
       <div className="project-list">
